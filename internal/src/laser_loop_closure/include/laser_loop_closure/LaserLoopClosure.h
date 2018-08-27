@@ -61,7 +61,7 @@
 #include <map>
 #include <vector>
 
-    class LaserLoopClosure
+class LaserLoopClosure
 {
   public:
     LaserLoopClosure();
@@ -162,8 +162,7 @@
     double icp_corr_dist_;
     unsigned int icp_iterations_;
 
-    // ISAM2 optimizer object, and best guess pose values.
-    //   std::unique_ptr<gtsam::ISAM2> isam_;
+    // GTSAM graph (constraints) and values (pose estimates)
     gtsam::NonlinearFactorGraph graph_;
     gtsam::Values values_;
 
@@ -189,8 +188,8 @@
     std::vector<Edge> odometry_edges_;
     std::vector<Edge> loop_edges_;
 
-    //   // For filtering laser scans prior to ICP.
-    //   PointCloudFilter filter_;
+    // Optimizer parameters
+    gtsam::LevenbergMarquardtParams params_ = gtsam::LevenbergMarquardtParams();
 };
 
 #endif

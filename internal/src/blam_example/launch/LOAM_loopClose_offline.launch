@@ -32,12 +32,6 @@
       <!-- Frames -->
       <rosparam file="$(find blam_example)/config/blam_frames.yaml"/>
 
-      <!-- Point cloud filter
-      <rosparam file="$(find point_cloud_filter)/config/parameters.yaml"/> -->
-
-      <!-- Point cloud odometry
-      <rosparam file="$(find point_cloud_odometry)/config/parameters.yaml"/> -->
-
       <!-- Loop closure -->
       <rosparam file="$(find laser_loop_closure)/config/parameters.yaml"/>
 
@@ -47,8 +41,6 @@
       <!-- Mapper -->
       <rosparam file="$(find point_cloud_mapper)/config/parameters.yaml"/>
     </node>
-
-    <!-- <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find blam_example)/rviz/lidar_slam.rviz" /> -->
 
   </group>
 

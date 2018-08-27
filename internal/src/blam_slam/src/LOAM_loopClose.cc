@@ -305,21 +305,19 @@ void BlamSlam::Process_PointCloud_Pose_Message(
     // Store the current pose value for future estimations
     pose_raw_prev_ = pose_raw_now;
 
-    ROS_INFO("blam 0");
     return;
   }
   // Calculate and use the relative changes in pose w.r.t. previous
   // values instead of absolute pose values. Thereafter, update the estimated
   // current pose based on the newly calculated incremental update.
-  // gu::Transform3 incremental_estimate_ = gu::PoseDelta(pose_raw_prev_, pose_raw_now);
-  gu::Transform3 incremental_estimate_ = gu::PoseDelta(pose_raw_now, pose_raw_prev_);
+  gu::Transform3 incremental_estimate_ = gu::PoseDelta(pose_raw_prev_, pose_raw_now);
+  // gu::Transform3 incremental_estimate_ = gu::PoseDelta(pose_raw_now, pose_raw_prev_);
   pose_raw_prev_ = pose_raw_now; // Store the current pose value for future estimations
   localization_.SetIntegratedEstimate(
       gu::PoseUpdate(
           localization_.GetIntegratedEstimate(),
           incremental_estimate_));
 
-  ROS_INFO("blam 1");
   // Check for new loop closures.
   bool new_keyframe;
   if (HandleLoopClosures(msg, incremental_estimate_, &new_keyframe))
@@ -340,7 +338,6 @@ void BlamSlam::Process_PointCloud_Pose_Message(
   }
   else
   {
-    ROS_INFO("blam 2");
     // No new loop closures - but was there a new key frame? If so, add new
     // points to the map.
     if (new_keyframe)
@@ -351,16 +348,13 @@ void BlamSlam::Process_PointCloud_Pose_Message(
                                           localization_.GetIntegratedEstimate());
       // pose_raw_now);
 
-      ROS_INFO("blam 3");
       // Insert the point cloud data into the map, if possible. Note that
       // 'msg_fixed' has pose defined in fixed global frame already - this is
       // where the pose obtained from pbstream file has to be inserted
       PointCloud::Ptr unused(new PointCloud);
       mapper_.InsertPoints(msg_fixed, unused.get());
-      ROS_INFO("blam 4");
     }
 
-    ROS_INFO("blam 5");
   }
 
   // Publish odometry edges, loop closure edges, nodes in the pose graph,
@@ -414,10 +408,13 @@ bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr &scan,
   //   }
   // }
   covariance.Zeros();
-  for (int i = 0; i < 3; ++i)
-    covariance(i, i) = 0.01;
-  for (int i = 3; i < 6; ++i)
-    covariance(i, i) = 0.004;
+  for (int i = 0; i < 6; ++i)
+    covariance(i, i) = 1;
+  // covariance.Zeros();
+  // for (int i = 0; i < 3; ++i)
+  //   covariance(i, i) = 0.01;
+  // for (int i = 3; i < 6; ++i)
+  //   covariance(i, i) = 0.004;
 
   // FIXME: Confirm that there are no time inconsistencies i.e. here it is
   // directly used but in the other file, we use a multiplication factor of 1e3.
@@ -427,14 +424,12 @@ bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr &scan,
   // optimisation)
   unsigned int pose_key;
   // const ros::Time stamp = pcl_conversions::fromPCL(scan->header.stamp * 1e3);
-  ROS_INFO("blam 6");
   const ros::Time stamp = pcl_conversions::fromPCL(scan->header.stamp);
   if (!loop_closure_.AddBetweenFactor(delta, covariance, stamp, &pose_key))
   {
     return false;
   }
   *new_keyframe = true;
-  ROS_INFO("blam 7");
 
   // simply inset the key-scan pair to the data storage vector, this should
   // ideally always return true
@@ -442,7 +437,6 @@ bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr &scan,
   {
     return false;
   }
-  ROS_INFO("blam 8");
 
   // Find all possible loop closures with the last added key and update the pose
   // graph accordingly (i.e. update the pose of all other existing nodes based
@@ -452,7 +446,6 @@ bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr &scan,
   {
     return false;
   }
-  ROS_INFO("blam 9");
 
   // Simply mention which keyed poses are used for loop closure
   for (const auto &closure_key : closure_keys)

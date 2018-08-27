@@ -11,17 +11,17 @@ check_for_loop_closures: true
 # pose to the pose graph. This helps keep the graph sparse so that loop closures
 # are fast.
 # translation_threshold: 0.25
-translation_threshold: 0.1
+translation_threshold: 0.01
 
 # When searching through old poses for loop closures, only consider old poses
 # that are within this distance of the current pose.
-proximity_threshold: 5.0
+proximity_threshold: 1.0
 
 # To compute a loop closure we perform ICP between the current scan and laser
 # scans captured from nearby poses. In order to be considered a loop closure,
 # the ICP "fitness score" must be less than this number.
 # max_tolerable_fitness: 0.15
-max_tolerable_fitness: 3.0
+max_tolerable_fitness: 1.0
 
 # Don't attempt loop closures with poses in the graph that were collected within
 # the last 'skip_recent_poses' poses.
@@ -31,3 +31,27 @@ skip_recent_poses: 500
 # many poses (i.e. the sensor would have to move translation_threshold *
 # poses_before_reclosing meters in order to close a new loop).
 poses_before_reclosing: 500
+
+
+
+# LevenbergMarquardtOptimizer parameters (see the following for details:
+# http://borg.cc.gatech.edu/sites/edu.borg/html/a00184.html#a21971e7b985115acab326deeedcfe220)
+LevenbergMarquardtParams:
+  maxIterations: 100
+  relativeErrorTol: 0.001
+  absoluteErrorTol: 0.01
+  errorTol: 0.001
+  verbosity: DELTA
+  linearSolverType: SEQUENTIAL_QR
+
+# The maximum iterations to stop iterating (default 100)
+# The maximum relative error decrease to stop iterating (default 1e-5)
+# The maximum absolute error decrease to stop iterating (default 1e-5)
+# The maximum total error to stop iterating (default 0.0)
+# The printing verbosity during optimization (default SILENT; allowed ERROR, VALUES, DELTA, LINEAR)
+# The type of linear solver to use in the nonlinear optimizer. (allowed MULTIFRONTAL_CHOLESKY, MULTIFRONTAL_QR, SEQUENTIAL_CHOLESKY, SEQUENTIAL_QR, Iterative, CHOLMOD)
+
+# # The variable elimination ordering, or empty to use COLAMD (default: empty)
+# ordering: 
+# # The container for iterativeOptimization parameters. used in CG Solvers. 
+# iterativeParams: 

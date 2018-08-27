@@ -53,8 +53,6 @@ namespace gr = gu::ros;
 namespace pu = parameter_utils;
 
 using gtsam::BetweenFactor;
-// using gtsam::ISAM2;
-// using gtsam::ISAM2Params;
 using gtsam::LevenbergMarquardtOptimizer;
 using gtsam::LevenbergMarquardtParams;
 using gtsam::NonlinearFactorGraph;
@@ -73,12 +71,6 @@ LaserLoopClosure::~LaserLoopClosure() {}
 bool LaserLoopClosure::Initialize(const ros::NodeHandle &n)
 {
   name_ = ros::names::append(n.getNamespace(), "LaserLoopClosure");
-
-  // if (!filter_.Initialize(n))
-  // {
-  //   ROS_ERROR("%s: Failed to initialize point cloud filter.", name_.c_str());
-  //   return false;
-  // }
 
   if (!LoadParameters(n))
   {
@@ -108,13 +100,64 @@ bool LaserLoopClosure::LoadParameters(const ros::NodeHandle &n)
   if (!pu::Get("check_for_loop_closures", check_for_loop_closures_))
     return false;
 
-  // // Load ISAM2 parameters.
-  // unsigned int relinearize_skip = 1;
-  // double relinearize_threshold = 0.01;
-  // if (!pu::Get("relinearize_skip", relinearize_skip))
-  //   return false;
-  // if (!pu::Get("relinearize_threshold", relinearize_threshold))
-  //   return false;
+  // Load Optimizer parameters.
+  unsigned int maxIterations;
+  if (!pu::Get("LevenbergMarquardtParams/maxIterations", maxIterations))
+    return false;
+  params_.maxIterations = maxIterations;
+
+  double relativeErrorTol;
+  if (!pu::Get("LevenbergMarquardtParams/relativeErrorTol", relativeErrorTol))
+    return false;
+  params_.relativeErrorTol = relativeErrorTol;
+
+  double absoluteErrorTol;
+  if (!pu::Get("LevenbergMarquardtParams/absoluteErrorTol", absoluteErrorTol))
+    return false;
+  params_.absoluteErrorTol = absoluteErrorTol;
+
+  double errorTol;
+  if (!pu::Get("LevenbergMarquardtParams/errorTol", errorTol))
+    return false;
+  params_.errorTol = errorTol;
+
+  std::string verbosity;
+  if (!pu::Get("LevenbergMarquardtParams/verbosity", verbosity))
+    return false;
+  // NOTE: Somehow SILENT and TERMINATION does not work
+  // if (verbosity == "SILENT")
+  //   params_.verbosity = LevenbergMarquardtParams::SILENT;
+  // else if (verbosity == "TERMINATION")
+  //   params_.verbosity = LevenbergMarquardtParams::TERMINATION;
+  // else
+  if (verbosity == "ERROR")
+    params_.verbosity = LevenbergMarquardtParams::ERROR;
+  else if (verbosity == "VALUES")
+    params_.verbosity = LevenbergMarquardtParams::VALUES;
+  else if (verbosity == "DELTA")
+    params_.verbosity = LevenbergMarquardtParams::DELTA;
+  else if (verbosity == "LINEAR")
+    params_.verbosity = LevenbergMarquardtParams::LINEAR;
+  else
+    ROS_WARN("%s: Incorrect param value input for LevenbergMarquardtParams/verbosity", name_.c_str());
+
+  std::string linearSolverType;
+  if (!pu::Get("LevenbergMarquardtParams/linearSolverType", linearSolverType))
+    return false;
+  if (linearSolverType == "MULTIFRONTAL_CHOLESKY")
+    params_.linearSolverType = LevenbergMarquardtParams::MULTIFRONTAL_CHOLESKY;
+  else if (linearSolverType == "MULTIFRONTAL_QR")
+    params_.linearSolverType = LevenbergMarquardtParams::MULTIFRONTAL_QR;
+  else if (linearSolverType == "SEQUENTIAL_CHOLESKY")
+    params_.linearSolverType = LevenbergMarquardtParams::SEQUENTIAL_CHOLESKY;
+  else if (linearSolverType == "SEQUENTIAL_QR")
+    params_.linearSolverType = LevenbergMarquardtParams::SEQUENTIAL_QR;
+  else if (linearSolverType == "Iterative")
+    params_.linearSolverType = LevenbergMarquardtParams::Iterative;
+  else if (linearSolverType == "CHOLMOD")
+    params_.linearSolverType = LevenbergMarquardtParams::CHOLMOD;
+  else
+    ROS_WARN("%s: Incorrect param value input for LevenbergMarquardtParams/verbosity", name_.c_str());
 
   // Load loop closing parameters.
   if (!pu::Get("translation_threshold", translation_threshold_))
@@ -169,13 +212,6 @@ bool LaserLoopClosure::LoadParameters(const ros::NodeHandle &n)
   if (!pu::Get("init/orientation_sigma/yaw", sigma_yaw))
     return false;
 
-  // // Create a new ISAM2 object with the new parameter values and use "isam_" as
-  // // the corresponding pointer
-  // ISAM2Params parameters;
-  // parameters.relinearizeSkip = relinearize_skip;
-  // parameters.relinearizeThreshold = relinearize_threshold;
-  // isam_.reset(new ISAM2(parameters));
-
   // Set the initial pose
   Vector3 translation(init_x, init_y, init_z);
   Rot3 rotation(Rot3::RzRyRx(init_roll, init_pitch, init_yaw));
@@ -187,19 +223,11 @@ bool LaserLoopClosure::LoadParameters(const ros::NodeHandle &n)
   LaserLoopClosure::Diagonal::shared_ptr covariance(
       LaserLoopClosure::Diagonal::Sigmas(noise));
 
-  // // Create a nonlinear factor graph (i.e. function holding motion constraints)
-  // NonlinearFactorGraph new_factor;
+  // Create a nonlinear factor graph (i.e. function holding motion constraints)
+  // and the corresponding values
   graph_.add(MakePriorFactor(pose, covariance));
-
-  // // Create a new value (i.e. the object holding the actual pose data for
-  // // different graph key nodes)
-  // Values new_value;
   values_.insert(key_, pose);
 
-  // NOTE: No need for graph optimization with only the first criteria
-
-  // isam_->update(new_factor, new_value);
-  // values_ = isam_->calculateEstimate();
   key_++;
 
   // Set the initial odometry.
@@ -247,42 +275,20 @@ bool LaserLoopClosure::AddBetweenFactor(
     return false;
   }
 
-  // Append the new odometry.
-  Pose3 new_odometry = ToGtsam(delta);
-
-  // NonlinearFactorGraph new_factor;
-  // Values new_value;
-  // new_factor.add(MakeBetweenFactor(new_odometry, ToGtsam(covariance)));
-
-  Pose3 last_pose = values_.at<Pose3>(key_ - 1);
-  // new_value.insert(key_, last_pose.compose(new_odometry));
-
   // Store this timestamp so that we can publish the pose graph later.
   keyed_stamps_.insert(std::pair<unsigned int, ros::Time>(key_, stamp));
 
-  // Update ISAM2.
-  // isam_->update(new_factor, new_value);
+  // Append the new odometry.
+  Pose3 new_odometry = ToGtsam(delta);
+  Pose3 last_pose = values_.at<Pose3>(key_ - 1);
   graph_.add(MakeBetweenFactor(new_odometry, ToGtsam(covariance)));
   values_.insert(key_, last_pose.compose(new_odometry));
-  // FIXME: Ideally, we should apply an optimizer at this step too
-  // LevenbergMarquardtParams params = LevenbergMarquardtParams();
-  // params.maxIterations = 1;
-  // params.relativeErrorTol = 1e-1;
-  // params.absoluteErrorTol = 1e-1;
-  // // params.verbosity = LevenbergMarquardtParams::VALUES;
-  // params.verbosity = LevenbergMarquardtParams::DELTA;
-  // // params.verbosity = LevenbergMarquardtParams::LINEAR;
-  // ROS_INFO("loop 0");
-  // Values results = LevenbergMarquardtOptimizer(graph_, values_, params).optimize();
-  // ROS_INFO("loop 1");
-  // values_.swap(results); // Swap the content of incorrect "values_" with corrected "results"
-  // values_ = isam_->calculateEstimate();
 
   // Assign output and get ready to go again!
   *key = key_++;
 
   // Is the odometry translation large enough to add a new keyframe to the
-  // graph? If not only add the key-pose pair but ideally no need to store it's
+  // graph? If not, only add the key-pose pair but ideally no need to store it's
   // scan to save data size
   odometry_ = odometry_.compose(new_odometry);
   if (odometry_.translation().norm() > translation_threshold_)
@@ -330,7 +336,6 @@ bool LaserLoopClosure::AddKeyScanPair(unsigned int key,
 bool LaserLoopClosure::FindLoopClosures(
     unsigned int key, std::vector<unsigned int> *closure_keys)
 {
-
   // If loop closure checking is off, don't do this step. This will save some
   // computation time.
   if (!check_for_loop_closures_)
@@ -399,17 +404,8 @@ bool LaserLoopClosure::FindLoopClosures(
   if (closed_loop) // If any loops losed
   {
     // Update the graph based on loop closure
-    LevenbergMarquardtParams params = LevenbergMarquardtParams();
-    params.maxIterations = 1;
-    params.relativeErrorTol = 1e-1;
-    params.absoluteErrorTol = 1e-1;
-    // params.verbosity = LevenbergMarquardtParams::VALUES;
-    params.verbosity = LevenbergMarquardtParams::DELTA;
-    // params.verbosity = LevenbergMarquardtParams::LINEAR;
-    ROS_INFO("loop 0");
-    Values results = LevenbergMarquardtOptimizer(graph_, values_, params).optimize();
-    // Values results = LevenbergMarquardtOptimizer(graph_, values_).optimize();
-    ROS_INFO("loop 1: Loop closed, hurray!");
+    LevenbergMarquardtOptimizer optimizer(graph_, values_, params_);
+    Values results = optimizer.optimize();
     values_.swap(results); // Swap the content of incorrect "values_" with corrected "results"
 
     // Notify that we found a loop closure.
@@ -491,7 +487,8 @@ void LaserLoopClosure::FindLoopClosures_Manual()
                first_key, last_key);
 
       // Update the graph based on loop closure
-      Values results = LevenbergMarquardtOptimizer(graph_, values_).optimize();
+      LevenbergMarquardtOptimizer optimizer(graph_, values_, params_);
+      Values results = optimizer.optimize();
       values_.swap(results); // Swap the content of incorrect "values_" with corrected "results"
     }
   }
@@ -635,13 +632,6 @@ bool LaserLoopClosure::PerformICP(const PointCloud::ConstPtr &scan1,
   icp.setMaximumIterations(icp_iterations_);
   icp.setRANSACIterations(0);
 
-  // // Filter the two scans. They are stored in the pose graph as dense scans for
-  // // visualization.
-  // PointCloud::Ptr scan1_filtered(new PointCloud);
-  // PointCloud::Ptr scan2_filtered(new PointCloud);
-  // filter_.Filter(scan1, scan1_filtered);
-  // filter_.Filter(scan2, scan2_filtered);
-
   // Set source point cloud. Transform it to pose 2 frame to get a delta.
   const Eigen::Matrix<double, 3, 3> R1 = pose1.rotation.Eigen();
   const Eigen::Matrix<double, 3, 1> t1 = pose1.translation.Eigen();
@@ -712,10 +702,13 @@ bool LaserLoopClosure::PerformICP(const PointCloud::ConstPtr &scan1,
   // }
   // FIXME: Use real ICP covariance. The "calculate_ICP_COV" function is returning NaN values
   covariance->Zeros();
-  for (int i = 0; i < 3; ++i)
-    (*covariance)(i, i) = 0.01;
-  for (int i = 3; i < 6; ++i)
-    (*covariance)(i, i) = 0.04;
+  for (int i = 0; i < 6; ++i)
+    (*covariance)(i, i) = 1;
+  // covariance->Zeros();
+  // for (int i = 0; i < 3; ++i)
+  //   (*covariance)(i, i) = 0.01;
+  // for (int i = 3; i < 6; ++i)
+  //   (*covariance)(i, i) = 0.04;
 
   // If the loop closure was a success, publish the two scans.
   source->header.frame_id = fixed_frame_id_;
