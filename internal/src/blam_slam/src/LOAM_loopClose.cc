@@ -410,12 +410,7 @@ bool BlamSlam::HandleLoopClosures(const PointCloud::ConstPtr &scan,
   covariance.Zeros();
   for (int i = 0; i < 6; ++i)
     covariance(i, i) = 1;
-  // covariance.Zeros();
-  // for (int i = 0; i < 3; ++i)
-  //   covariance(i, i) = 0.01;
-  // for (int i = 3; i < 6; ++i)
-  //   covariance(i, i) = 0.004;
-
+    
   // FIXME: Confirm that there are no time inconsistencies i.e. here it is
   // directly used but in the other file, we use a multiplication factor of 1e3.
 

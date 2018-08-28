@@ -35,7 +35,6 @@
  */
 
 #include <laser_loop_closure/LaserLoopClosure.h>
-#include <laser_loop_closure/cov_func_point_to_plane.h>
 #include <boost/range/adaptor/reversed.hpp>
 
 #include <geometry_utils/GeometryUtilsROS.h>
@@ -675,40 +674,10 @@ bool LaserLoopClosure::PerformICP(const PointCloud::ConstPtr &scan1,
 
   *delta = gu::PoseUpdate(update, gu::PoseDelta(pose1, pose2));
 
-  // // Calculate covariance in ICP_COV
-  // Eigen::MatrixXd ICP_COV(6, 6);
-  // ICP_COV = Eigen::MatrixXd::Zero(6, 6);
-
-  // pcl::PointCloud<pcl::PointNormal> source_normal;
-  // pcl::PointCloud<pcl::PointNormal> target_normal;
-  // pcl::copyPointCloud(*source, source_normal);
-  // pcl::copyPointCloud(*target, target_normal);
-  // calculate_ICP_COV(source_normal, target_normal, T, ICP_COV);
-
-  // // // Convert ICP_COV (Eigen::MatrixXd) to covariance
-  // // // (LaserLoopClosure::Mat66 i.e. geometry_utils::MatrixNxNBase<double, 6>)
-  // // covariance = LaserLoopClosure::Mat66(ICP_COV(0, 0), ICP_COV(0, 1), ICP_COV(0, 2), ICP_COV(0, 3), ICP_COV(0, 4), ICP_COV(0, 5),
-  // //                                      ICP_COV(1, 0), ICP_COV(1, 1), ICP_COV(1, 2), ICP_COV(1, 3), ICP_COV(1, 4), ICP_COV(1, 5),
-  // //                                      ICP_COV(2, 0), ICP_COV(2, 1), ICP_COV(2, 2), ICP_COV(2, 3), ICP_COV(2, 4), ICP_COV(2, 5),
-  // //                                      ICP_COV(3, 0), ICP_COV(3, 1), ICP_COV(3, 2), ICP_COV(3, 3), ICP_COV(3, 4), ICP_COV(3, 5),
-  // //                                      ICP_COV(4, 0), ICP_COV(4, 1), ICP_COV(4, 2), ICP_COV(4, 3), ICP_COV(4, 4), ICP_COV(4, 5),
-  // //                                      ICP_COV(5, 0), ICP_COV(5, 1), ICP_COV(5, 2), ICP_COV(5, 3), ICP_COV(5, 4), ICP_COV(5, 5));
-  // for (int i = 0; i < 6; i++)
-  // {
-  //   for (int j = 0; j < 6; j++)
-  //   {
-  //     (*covariance)(i, j) = ICP_COV(i, j);
-  //   }
-  // }
-  // FIXME: Use real ICP covariance. The "calculate_ICP_COV" function is returning NaN values
+  // FIXME: Use real ICP covariance.
   covariance->Zeros();
   for (int i = 0; i < 6; ++i)
     (*covariance)(i, i) = 1;
-  // covariance->Zeros();
-  // for (int i = 0; i < 3; ++i)
-  //   (*covariance)(i, i) = 0.01;
-  // for (int i = 3; i < 6; ++i)
-  //   (*covariance)(i, i) = 0.04;
 
   // If the loop closure was a success, publish the two scans.
   source->header.frame_id = fixed_frame_id_;

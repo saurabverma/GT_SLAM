@@ -1,44 +1,38 @@
-# B(erkeley) L(ocalization) A(nd) M(apping)!
+# GT_SLAM (Ground Truth SLAM)
 
-![alt text](https://github.com/erik-nelson/blam/raw/master/blam_mosaic.png)
+This is an effort to create a robust backend SLAM which can input data from different sensors and out the best possible quality of map generated.
+Loop closures are also handled by the system in both automatic and manual approaches.
+The system is designed to be used in offline mode because of a lot of backend optimisation processes running based on constraint-requirements.
 
-***BLAM!*** is an open-source software package for LiDAR-based real-time 3D localization and mapping. ***BLAM!*** is developed by Erik Nelson from the Berkeley AI Research Laboratory ([BAIR](http://bair.berkeley.edu)). See https://youtu.be/08GTGfNneCI for a video example.
+These ROS packages are designed by combining only required extracts from a lot of well-tested online available packages such as Blam-Slam, LOAM, etc.
 
-## Build Instructions
-This repository contains two ROS workspaces (one internal, one external). The build process is proctored by the `update` script. To build, first make sure that you do not have any other ROS workspaces in your `ROS_PACKAGE_PATH`, then clone the repository and from the top directory execute
+## Input
 
-```bash
-./update
-```
+1. BAG FILE: A rosbag file containing a laser scan time-stamped data.
+2. PBSTREAM: Atleast one pbstream data contaning time-stamped pose of the robot estimated from different sensors (the time stamps need not be the same as that of laser scan data).
 
-## Run Instructions
-***BLAM!*** is written in C++ with some Python interface elements, wrapped by
-Robot Operating System ([ROS](http://ros.org)). Input LiDAR data should be
-provided to the `/velodyne_points` topic using message type `sensor_msgs::PointCloud2`.
+## OUTPUT:
 
-To run in online mode (e.g. by replaying a bag file from another terminal or
-using a real-time sensor stream), use
+1. PBSTREAM: (Optional) A pbstream file containing optimized poses of the robot for each key-frame laser scan data.
+The optimized/corrected ground truth map can be manually regenerated later at any time using respective time-stamped poses from this output file.
 
-```bash
-roslaunch blam_example test_online.launch
-```
+## Compilation
 
-To run in offline mode, i.e. by loading a bagfile and processing its data as
-fast as possible, set the bagfile name and scan topic in
-`blam_example/launch/test_offline.launch`, and use
+Run the file: "./update" to compile all required packages.
 
-```bash
-roslaunch blam_example test_offline.launch
-```
+## Run
 
-An example .rviz configuration file is provided under
-`blam_example/rviz/lidar_slam.rviz`.
+Call the "LOAM_loopClose_offline.launch" to start the process.
+
+NOTE: The tuning parameters are available in yaml files of the respective packages.
 
 ## Dependencies
 
-***BLAM!*** relies on system installations of the following packages:
+NOTE: BLAM relies on system installations of GTSAM (https://collab.cc.gatech.edu/borg/gtsam).
+GTSAM in particular should be installed manually from source using the latest version of the develop branch from https://bitbucket.org/gtborg/gtsam.
 
-* [ROS](http://wiki.ros.org/ROS/Installation)
-* [GTSAM](https://collab.cc.gatech.edu/borg/gtsam)
+The package is tested to be functional with ROS Kinetic and Ubuntu 16.04.
 
-GTSAM in particular should be installed from source using the latest version of the develop branch from https://bitbucket.org/gtborg/gtsam. GTSAM relies on Boost, an incorrect version of which will interfere with some of ROS' packages if ROS is not upgraded to at least Indigo. ROS Indigo, in turn, relies on Ubuntu 14.04.
+For further details, please contact me:
+saurabverma@u.nus.edu; saurabverma@gmail.com
+

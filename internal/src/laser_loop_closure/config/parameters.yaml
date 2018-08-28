@@ -3,10 +3,6 @@
 # check_for_loop_closures: false
 check_for_loop_closures: true
 
-# # Default parameters for the ISAM2 data structure.
-# relinearize_skip: 1
-# relinearize_threshold: 0.01
-
 # Amount of translational distance the sensor must travel before adding a new
 # pose to the pose graph. This helps keep the graph sparse so that loop closures
 # are fast.
@@ -41,7 +37,7 @@ LevenbergMarquardtParams:
   relativeErrorTol: 0.001
   absoluteErrorTol: 0.01
   errorTol: 0.001
-  verbosity: DELTA
+  verbosity: SILENT
   linearSolverType: SEQUENTIAL_QR
 
 # The maximum iterations to stop iterating (default 100)

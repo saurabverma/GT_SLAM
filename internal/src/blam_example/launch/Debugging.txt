@@ -1,3 +1,0 @@
-Include the following in the ros node to include gdb debugging capabilities:
-
-launch-prefix="gdb -ex run --args"
