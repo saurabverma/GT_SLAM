@@ -105,6 +105,12 @@ class LaserLoopClosure
     // Get the most recent pose in the pose graph.
     geometry_utils::Transform3 GetLastPose() const;
 
+    // Get the most recent pose in the pose graph.
+    std::vector<geometry_utils::Transform3> GetAllPose() const;
+
+    // Optimize graph based on interrupt signals.
+    void OptimizeNow();
+
     // Publish pose graph for visualization.
     void PublishPoseGraph();
 
@@ -145,7 +151,7 @@ class LaserLoopClosure
     // Aggregate odometry until we can update the pose graph.
     gtsam::Pose3 odometry_; // helps check whether a node should be considered as a keyframe
 
-    // Pose graph and ISAM2 parameters.
+    // Pose graph parameters.
     bool check_for_loop_closures_;  // flag to confirm whether to perform loop closure
     unsigned int key_;              // count of how many keys we have in total
     unsigned int last_closure_key_; // at which last key the loop closure was performed

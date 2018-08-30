@@ -55,6 +55,7 @@
 #include <geometry_utils/Rotation3.h>
 #include <geometry_utils/Quaternion.h>
 #include <geometry_utils/Vector3.h>
+#include <geometry_utils/GeometryUtils.h>
 #include <geometry_utils/GeometryUtilsROS.h>
 
 #include "LOAM_loopClose.h"
@@ -131,12 +132,12 @@ public:
 private:
   bool LoadParameters(const ros::NodeHandle &n)
   {
-    // Checking if the pbstream filename exists
-    if (!pu::Get("filename/pbstream", pbstream_filename_))
+    // Checking if the lidar input pbstream filename exists
+    if (!pu::Get("filename/pbstream_lidar_input", pbstream_lidar_input_filename_))
       return false;
-    CHECK(!pbstream_filename_.empty()) << "-traj_filename is missing.";
+    CHECK(!pbstream_lidar_input_filename_.empty()) << "-traj_filename is missing.";
 
-    // Check that bag file exists.
+    // Check that input bag file exists.
     if (!pu::Get("filename/bag", bag_filename_))
       return false;
     boost::filesystem::path bag_path(bag_filename_);
@@ -153,6 +154,20 @@ private:
     // Check if loop closure is compulsory.
     if (!pu::Get("enforce_manual_loopClose", enforce_manual_loopClose_))
       return false;
+
+    // Check if final pose graph needs to be optimized.
+    if (!pu::Get("enforce_final_optimize", enforce_final_optimize_))
+      return false;
+
+    // Check if the final optimized pose graph is to be stored.
+    if (!pu::Get("save_poses", save_poses_))
+      return false;
+    if (save_poses_)
+    {
+      // Check that output pbstream filename exists.
+      if (!pu::Get("filename/pbstream_output", pbstream_output_filename_))
+        return false;
+    }
 
     return true;
   }
@@ -177,16 +192,20 @@ private:
     ros::Time bag_time_start, bag_time;
     bool bag_time_start_set = false;
 
+    // Note: Store the timestamps of poses from rosbag; later reuse the timestamps
+    // for storing the corresponding pose values
+    std::vector<ros::Time> pose_time_stamps;
+
     /*********************************************************************
     Reading pbstream file containing stamped pose3d data in proto datatype
     *********************************************************************/
 
     // Read the pbstream file, get all the data in one shot as 'proto' datatype
-    ROS_INFO("Using trajectory (pbstream) file: %s", pbstream_filename_.c_str());
-    cartographer::io::ProtoStreamReader reader(pbstream_filename_);
+    ROS_INFO("%s: Using trajectory (pbstream) file: %s", name_.c_str(), pbstream_lidar_input_filename_.c_str());
+    cartographer::io::ProtoStreamReader reader(pbstream_lidar_input_filename_);
     cartographer::mapping::proto::Trajectory proto_traj;
     CHECK(reader.ReadProto(&proto_traj));
-    ROS_INFO("nodes contained %d in the pbstream file", proto_traj.node_size());
+    ROS_INFO("%s: nodes contained %d in the pbstream file", name_.c_str(), proto_traj.node_size());
 
     // Create an interpolation object such that the pose can be interpolated
     // between two given time stamps
@@ -200,7 +219,7 @@ private:
 
     // Open the rosbag file to get required velodyne pointcloud points
     rosbag::Bag bag(bag_filename_, rosbag::bagmode::Read);
-    ROS_INFO("Using bag file: %s", bag_filename_.c_str());
+    ROS_INFO("%s: Using bag file: %s", name_.c_str(), bag_filename_.c_str());
 
     // Get a view struct instance of the required topics from the bag file, this
     // helps read messages later easily
@@ -223,7 +242,8 @@ private:
 
       // If pose tf interpolation is possible for the pcl data, then perform the
       // following
-      if (transform_interpolation_buffer.Has(cartographer_ros::FromRos(pc2_msg->header.stamp)))
+      pose_time_stamps.push_back(pc2_msg->header.stamp);
+      if (transform_interpolation_buffer.Has(cartographer_ros::FromRos(pose_time_stamps.back())))
       {
         // Filter our infinity OR ill-defined points from the cloud
         PointCloud::Ptr pcl_cloud_noNaN_ptr = PointCloud::Ptr(new PointCloud());
@@ -231,10 +251,8 @@ private:
         pcl::removeNaNFromPointCloud(pcl_cloud, (*pcl_cloud_noNaN_ptr), indices);
 
         // Get the pose data at the time stamped specified by the pcl message.
-        // NOTE: The rotation quaternion values are known to be screwed for some
-        // unknown purpose.
         const cartographer::transform::Rigid3d tracking_to_map =
-            transform_interpolation_buffer.Lookup(cartographer_ros::FromRos(pc2_msg->header.stamp));
+            transform_interpolation_buffer.Lookup(cartographer_ros::FromRos(pose_time_stamps.back()));
         gu::Transform3 pose;
         pose.translation = gu::Vec3(tracking_to_map.translation().x(),
                                     tracking_to_map.translation().y(),
@@ -249,8 +267,7 @@ private:
 
         // Publish data along with time stamp
         rosgraph_msgs::Clock clock_msg;
-        // clock_msg.clock = ros::Time().fromNSec(pcl_cloud_noNaN_ptr->header.stamp * 1e3);
-        clock_msg.clock = ros::Time().fromNSec(pcl_cloud_noNaN_ptr->header.stamp);
+        clock_msg.clock = pose_time_stamps.back();
         // Raw point cloud publish
         if (scan_pub_.getNumSubscribers() > 0)
           scan_pub_.publish(pcl_cloud_noNaN_ptr);
@@ -271,21 +288,18 @@ private:
         // Run this once to set the starting time for bag file data
         if (!bag_time_start_set)
         {
-          // bag_time_start = ros::Time().fromNSec(pcl_cloud_noNaN_ptr->header.stamp * 1e3);
-          bag_time_start = ros::Time().fromNSec(pcl_cloud_noNaN_ptr->header.stamp);
+          bag_time_start = pose_time_stamps.back();
           bag_time_start_set = true;
         }
-        // bag_time = ros::Time().fromNSec(pcl_cloud_noNaN_ptr->header.stamp * 1e3);
-        bag_time = ros::Time().fromNSec(pcl_cloud_noNaN_ptr->header.stamp);
+        bag_time = pose_time_stamps.back();
+      }
+      else
+      {
+        ROS_WARN("%s: Expected time stamp (%f) of scan from bag file not found in pose interpolation from pbstream file.",
+                 name_.c_str(), pose_time_stamps.back().toSec());
       }
     }
     bag.close();
-
-    const double total_wall_time =
-        (ros::WallTime::now() - wall_time_start).toSec();
-    const double total_bag_time = (bag_time - bag_time_start).toSec();
-    ROS_INFO("%s: Finished processing bag file at %lf percent speed of real-time.",
-             name_.c_str(), (total_bag_time / total_wall_time) * 100.f);
 
     // Apply overall loop closure if required
     if (enforce_manual_loopClose_)
@@ -294,18 +308,79 @@ private:
       slam_.ForcedLoopClosure();
     }
 
+    // Apply final graph optimization (compulsory for )
+    if (enforce_final_optimize_ || save_poses_)
+    {
+      ROS_INFO("%s: Applying final graph optimization on demand.", name_.c_str());
+      slam_.OptimizeGraph();
+    }
+
+    // Save final pose as pbstream
+    if (save_poses_)
+    {
+      ROS_INFO("%s: Getting optimised poses from pose graph.", name_.c_str());
+      std::vector<gu::Transform3> poses_new = slam_.SaveTraj();
+
+      // Convert data to Cartographer trajectory
+      cartographer::mapping::proto::Trajectory proto_traj_new;
+      for (unsigned int i = 0; i < poses_new.size(); i++)
+      {
+        // Add a new node in the trajectory
+        auto new_node = proto_traj_new.add_node();
+
+        // Set time stamp assuming the stamps are same as the collected earlier
+        new_node->set_timestamp(cartographer::common::ToUniversal(
+            cartographer_ros::FromRos(pose_time_stamps.at(i))));
+
+        // Create a new proto pose and add to the newly created trajectory node
+        gu::Quaternion pose_quat = gu::RToQuat(poses_new.at(i).rotation);
+        cartographer::transform::proto::Rigid3d *t_proto_rigid3d =
+            new cartographer::transform::proto::Rigid3d(
+                cartographer::transform::ToProto(
+                    cartographer::transform::Rigid3d(
+                        cartographer::transform::Rigid3d::Vector(
+                            poses_new.at(i).translation(1),
+                            poses_new.at(i).translation(2),
+                            poses_new.at(i).translation(3)),
+                        cartographer::transform::Rigid3d::Quaternion(
+                            pose_quat(1),
+                            pose_quat(2),
+                            pose_quat(3),
+                            pose_quat(4)))));
+        new_node->set_allocated_pose(t_proto_rigid3d);
+      }
+
+      // Save the data and close the file
+      ROS_INFO("%s: New trajectory node size: %d", name_.c_str(), proto_traj_new.node_size());
+      cartographer::io::ProtoStreamWriter writer(pbstream_output_filename_);
+      writer.WriteProto(proto_traj_new);
+      writer.Close();
+      ROS_INFO("%s: Saved trajectory from optimized pose graph to pbstream file: %s",
+               name_.c_str(), pbstream_output_filename_.c_str());
+    }
+
+    // Notify completion of the bag
+    const double total_wall_time =
+        (ros::WallTime::now() - wall_time_start).toSec();
+    const double total_bag_time = (bag_time - bag_time_start).toSec();
     ROS_INFO("%s: Completed whole process in %lf s.",
-             name_.c_str(), (ros::WallTime::now() - wall_time_start).toSec());
+             name_.c_str(), total_wall_time);
+    ROS_INFO("%s: Finished processing pose graph at %lf percent speed of real-time.",
+             name_.c_str(), (total_bag_time / total_wall_time) * 100.f);
+
     return true;
   }
 
   std::string name_;
 
   std::string scan_topic_;
-  std::string pbstream_filename_;
+  std::string pbstream_lidar_input_filename_;
   std::string bag_filename_;
+  std::string pbstream_output_filename_;
 
   bool enforce_manual_loopClose_;
+  bool enforce_final_optimize_;
+  bool save_poses_;
 
   BlamSlam slam_;
 

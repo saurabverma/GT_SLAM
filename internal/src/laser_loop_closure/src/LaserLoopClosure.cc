@@ -124,12 +124,9 @@ bool LaserLoopClosure::LoadParameters(const ros::NodeHandle &n)
   if (!pu::Get("LevenbergMarquardtParams/verbosity", verbosity))
     return false;
   // NOTE: Somehow SILENT and TERMINATION does not work
-  // if (verbosity == "SILENT")
-  //   params_.verbosity = LevenbergMarquardtParams::SILENT;
-  // else if (verbosity == "TERMINATION")
-  //   params_.verbosity = LevenbergMarquardtParams::TERMINATION;
-  // else
-  if (verbosity == "ERROR")
+  if (verbosity == "SILENT" || verbosity == "TERMINATION")
+    ROS_DEBUG("%s: SILENT param value set for LevenbergMarquardtParams/verbosity", name_.c_str());
+  else  if (verbosity == "ERROR")
     params_.verbosity = LevenbergMarquardtParams::ERROR;
   else if (verbosity == "VALUES")
     params_.verbosity = LevenbergMarquardtParams::VALUES;
@@ -534,11 +531,40 @@ gu::Transform3 LaserLoopClosure::GetLastPose() const
   {
     return ToGu(values_.at<Pose3>(key_ - 1));
   }
-  else
+  else if (key_ > 0)
   {
     ROS_WARN("%s: The graph only contains its initial pose.", name_.c_str());
     return ToGu(values_.at<Pose3>(0));
   }
+  else
+  {
+    ROS_WARN("%s: The pose graph is empty, cannot return anything valid.", name_.c_str());
+    gu::Transform3 pose;
+    return pose;
+  }
+}
+
+std::vector<gu::Transform3> LaserLoopClosure::GetAllPose() const
+{
+  std::vector<gu::Transform3> poses_new_vector;
+  if (key_ > 0)
+  {
+    for (unsigned int i = 0; i < key_; i++)
+      poses_new_vector.push_back(ToGu(values_.at<Pose3>(i)));
+  }
+  else
+  {
+    ROS_WARN("%s: The pose graph is empty, cannot return anything valid.", name_.c_str());
+  }
+  return poses_new_vector;
+}
+
+void LaserLoopClosure::OptimizeNow()
+{
+  // Update the graph based on loop closure
+  LevenbergMarquardtOptimizer optimizer(graph_, values_, params_);
+  Values results = optimizer.optimize();
+  values_.swap(results); // Swap the content of incorrect "values_" with corrected "results"
 }
 
 gu::Transform3 LaserLoopClosure::ToGu(const Pose3 &pose) const
@@ -674,7 +700,7 @@ bool LaserLoopClosure::PerformICP(const PointCloud::ConstPtr &scan1,
 
   *delta = gu::PoseUpdate(update, gu::PoseDelta(pose1, pose2));
 
-  // FIXME: Use real ICP covariance.
+  // TODO: Use real ICP covariance.
   covariance->Zeros();
   for (int i = 0; i < 6; ++i)
     (*covariance)(i, i) = 1;

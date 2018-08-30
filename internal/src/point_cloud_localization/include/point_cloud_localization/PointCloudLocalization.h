@@ -56,31 +56,11 @@ public:
   // Calls LoadParameters and RegisterCallbacks. Fails on failure of either.
   bool Initialize(const ros::NodeHandle &n);
 
-  // // Transform a point cloud from the sensor frame into the fixed frame using
-  // // the current best position estimate.
-  // bool TransformPointsToFixedFrame(const PointCloud &points,
-  //                                  PointCloud *points_transformed) const;
-
   bool TransformPointsToPose(const PointCloud &points,
                              PointCloud *points_transformed,
                              const gu::Transform3 &estimate) const;
 
-  // // Transform a point cloud from the fixed frame into the sensor frame using
-  // // the current best position estimate.
-  // bool TransformPointsToSensorFrame(const PointCloud &points,
-  //                                   PointCloud *points_transformed) const;
-
-  // // Store incremental estimate from odometry.
-  // bool MotionUpdate(const geometry_utils::Transform3 &incremental_odom);
-
-  // // Align incoming point cloud with a reference point cloud from the map.
-  // // Output the query scan aligned in the localization frame.
-  // bool MeasurementUpdate(const PointCloud::Ptr &query,
-  //                        const PointCloud::Ptr &reference,
-  //                        PointCloud *aligned_query);
-
   // Get pose estimates.
-  // const geometry_utils::Transform3 &GetIncrementalEstimate() const;
   const geometry_utils::Transform3 &GetIntegratedEstimate() const;
 
   // Set integrated estimate. Useful for graph SLAM whenever the pose graph is
@@ -105,14 +85,12 @@ private:
   std::string name_;
 
   // Pose estimate.
-  // geometry_utils::Transform3 incremental_estimate_;
   geometry_utils::Transform3 integrated_estimate_;
 
   // Publishers.
   ros::Publisher reference_pub_;
   ros::Publisher query_pub_;
   ros::Publisher aligned_pub_;
-  // ros::Publisher incremental_estimate_pub_;
   ros::Publisher integrated_estimate_pub_;
 
   // Most recent point cloud time stamp for publishers.

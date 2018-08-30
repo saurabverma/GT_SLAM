@@ -11,12 +11,19 @@
           <!-- launch-prefix="gdb -ex run - -args"> -->
 
       <!-- Bagfile parameters -->
-      <param name="filename/pbstream" value="/root/docker_mount/bags/draft_media_circle_loop_closure_Zeeshan/output.pbstream"/>
+      <param name="filename/pbstream_lidar_input" value="/root/docker_mount/bags/draft_media_circle_loop_closure_Zeeshan/output.pbstream"/>
       <param name="filename/bag" value="/root/docker_mount/bags/draft_media_circle_loop_closure_Zeeshan/output.bag"/>
       <param name="scan_topic" value="/velodyne_points"/>
 
       <!-- Assuming the robot starts and ends at the exact same pose, then manually the loop can be closed -->
       <param name="enforce_manual_loopClose" value="false"/>
+
+      <!-- Assure that the final pose graph is optimized -->
+      <param name="enforce_final_optimize" value="false"/>
+
+      <!-- Save the final pose graph values to a pbstream file, after a compulsory final optimization -->
+      <param name="save_poses" value="true"/>
+      <param name="filename/pbstream_output" value="/root/docker_mount/corrected_posegraph.pbstream"/>
 
       <!-- Initial pose -->
       <rosparam param="init">
@@ -41,6 +48,8 @@
       <!-- Mapper -->
       <rosparam file="$(find point_cloud_mapper)/config/parameters.yaml"/>
     </node>
+
+    <!-- <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find blam_example)/rviz/lidar_slam.rviz" /> -->
 
   </group>
 
