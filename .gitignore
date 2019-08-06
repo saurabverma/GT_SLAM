@@ -41,3 +41,6 @@ internal/devel
 
 # VSCode files
 .vscode
+
+# External dependencies
+dependencies

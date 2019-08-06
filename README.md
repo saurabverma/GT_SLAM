@@ -28,11 +28,11 @@ NOTE: The tuning parameters are available in yaml files of the respective packag
 
 ## Dependencies
 
-NOTE: BLAM relies on system installations of GTSAM (https://collab.cc.gatech.edu/borg/gtsam).
+NOTE: BLAM relies on system installations of GTSAM (https://collab.cc.gatech.edu/borg/gtsam OR https://bitbucket.org/gtborg/gtsam/src/develop/).
 GTSAM in particular should be installed manually from source using the latest version of the develop branch from https://bitbucket.org/gtborg/gtsam.
 
 The package is tested to be functional with ROS Kinetic and Ubuntu 16.04.
 
 For further details, please contact me:
-saurabverma@u.nus.edu; saurabverma@gmail.com
+saurabverma@i2r.a-star.edu.sg; saurabverma@gmail.com
 

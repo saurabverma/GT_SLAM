@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Change location
+mkdir dependencies
+cd dependencies
+
+# Install boost
+apt update
+apt install libboost-all-dev
+
+# Install latest version of cmake (required >=3.8, which apt doesn't support yet)
+curl -L $( \
+    { echo 'https://github.com/Kitware/CMake/releases/' | tr -d '\n'; \
+    curl -s https://github.com/Kitware/CMake/releases/ | grep -m 1 "Linux-x86_64.sh" | cut -d "/" -f 5,6,7 | cut -d "\"" -f 1; } ) \
+    -o cmake.sh
+yes | bash cmake.sh
+rm cmake.sh
+cd cmake*/bin
+export PATH=$(pwd):$PATH
+cd ../..
+
+# Install GTSAM
+git clone https://bitbucket.org/gtborg/gtsam.git
+mkdir -p gtsam/build
+cd gtsam/build
+cmake ..
+make check -j64
+make install -j64
+cd ../..
+rm -r gtsam
+
+# Change back location
+cd ..

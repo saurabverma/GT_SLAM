@@ -10,7 +10,7 @@ if [ ! -d "./src" ]; then
 fi
 wstool merge -t src blam-external.rosinstall
 wstool up -t src
-catkin_make_isolated --install --cmake-args -DCMAKE_BUILD_TYPE=Release
+catkin_make_isolated -j64 --install --cmake-args -DCMAKE_BUILD_TYPE=Release
 if [ ! -d "./install_isolated" ]; then
   touch ${TOP_DIR}/external/install_isolated/.catkin
   source ${TOP_DIR}/external/install_isolated/setup.bash
@@ -24,5 +24,5 @@ if [ ! -d "./src" ]; then
 fi
 wstool merge -t src blam-internal.rosinstall
 wstool up -t src
-catkin_make --cmake-args -DCMAKE_BUILD_TYPE=Release
+catkin_make -j64 --cmake-args -DCMAKE_BUILD_TYPE=Release
 source ${TOP_DIR}/internal/devel/setup.bash --extend
